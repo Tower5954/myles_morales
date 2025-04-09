@@ -1,0 +1,11 @@
+{
+    "model_name": "prowler_ai",
+    "base_model": "deepseek-r1:1.5b",
+    "modelfile_path": "ProwlerModelfile",
+    "prompt_template_path": "prowler_prompt_template.txt",
+    "system_prompt_path": "prowler_system_prompt.txt",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "request_timeout": 10,
+    "request_delay": 1.0,
+    "verbose": true
+}

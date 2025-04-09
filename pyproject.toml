@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "miles-ai"
+version = "0.1.0"
+description = "Custom web scraping agent for contact information"
+authors = ["Grant Thompson g.thompson59@live.co.uk "]
+readme = "README.md"
+packages = [{include = "app"}]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<4.0"
+requests = "^2.32.3"
+beautifulsoup4 = "^4.13.3"
+ollama = "^0.4.7"
+selenium = "^4.19.0"
+webdriver-manager = "^4.0.1"
+flask = "^3.1.0"
+flask-cors = "^5.0.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+contact-finder = "app.main:main"

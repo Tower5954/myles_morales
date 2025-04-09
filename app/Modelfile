@@ -1,0 +1,31 @@
+FROM qwen2.5:latest
+
+# Model behaviour settings 
+PARAMETER temperature 0.6          
+PARAMETER top_p 0.8               
+PARAMETER top_k 40                 
+PARAMETER stop "STOP"              
+PARAMETER num_ctx 8192             
+PARAMETER num_predict 512          
+PARAMETER repeat_penalty 1.1       
+PARAMETER repeat_last_n 64        
+PARAMETER num_gpu 1                
+PARAMETER num_thread 4             
+PARAMETER num_batch 512            
+PARAMETER mirostat 0               
+PARAMETER mirostat_tau 5.0         
+PARAMETER mirostat_eta 0.1         
+PARAMETER seed 42                  
+PARAMETER num_keep 0               
+
+# Define the agent's purpose and behaviour from external file
+SYSTEM @miles_system_prompt.txt
+
+# Link to the separate prompt template file
+TEMPLATE """
+{{.System}}
+
+{{.Prompt}}
+
+User Search Term: {{.Query}}
+"""

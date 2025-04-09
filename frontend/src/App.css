@@ -1,0 +1,47 @@
+
+.app-container {
+  height: 100vh;
+  padding: 0;
+  overflow: hidden;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+}
+
+.sidebar-col {
+  height: 100%;
+  border-right: 1px solid #e6e6e6;
+  background-color: #f8f9fa;
+  padding: 0;
+}
+
+.chat-col {
+  height: 100%;
+  background-color: #ffffff;
+  padding: 0;
+}
+
+.row {
+  margin: 0;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .sidebar-col {
+    position: fixed;
+    z-index: 1000;
+    width: 80%;
+    max-width: 300px;
+    height: 100%;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+  
+  .sidebar-col.open {
+    transform: translateX(0);
+  }
+  
+  .chat-col {
+    width: 100%;
+  }
+}
