@@ -31,19 +31,19 @@ class BulkContactFinder:
         """
         self.contact_finder = ContactFinder(config_path)
         
-        # Initialize evaluator if available
+        # Initialise evaluator if available
         self.evaluator = None
         if EVALUATOR_AVAILABLE:
             try:
                 self.evaluator = ContactEvaluator(config_path)
-                print("ContactEvaluator initialized successfully")
+                print("ContactEvaluator initialised successfully")
             except Exception as e:
-                print(f"Warning: Failed to initialize ContactEvaluator: {e}")
+                print(f"Warning: Failed to initialise ContactEvaluator: {e}")
         
         # Convert output_dir to absolute path based on the current working directory
         # This ensures we always save files in a consistent location
         self.output_dir = os.path.abspath(output_dir)
-        print(f"BulkContactFinder initialized with output directory: {self.output_dir}")
+        print(f"BulkContactFinder initialised with output directory: {self.output_dir}")
         
         # Create output directory if it doesn't exist
         os.makedirs(self.output_dir, exist_ok=True)
@@ -53,7 +53,8 @@ class BulkContactFinder:
         names: List[str], 
         query: str, 
         save_full_results: bool = True,
-        prowler = None  # Optional prowler evaluator
+        prowler = None,  # Optional prowler evaluator
+        progress_callback = None  # New parameter for progress reporting
     ) -> str:
         """
         Perform bulk searches with a custom user query
@@ -63,6 +64,7 @@ class BulkContactFinder:
             query (str): User's specific search query
             save_full_results (bool): Whether to save detailed results to a file
             prowler: Optional prowler evaluator
+            progress_callback: Optional callback function for progress reporting
         
         Returns:
             str: Filename of the saved results
@@ -206,6 +208,10 @@ class BulkContactFinder:
                 
                 bulk_results.append(result_entry)
                 
+                # Call the progress callback if provided to update frontend
+                if progress_callback and callable(progress_callback):
+                    progress_callback(name)
+                
             except Exception as search_err:
                 print(f"Error searching for {name}: {search_err}")
                 bulk_results.append({
@@ -215,6 +221,10 @@ class BulkContactFinder:
                     "Sources": [],
                     "Error": str(search_err)
                 })
+                
+                # Still call the progress callback for failed companies
+                if progress_callback and callable(progress_callback):
+                    progress_callback(name)
         
         # Save full results if requested
         filename = ""
@@ -600,8 +610,6 @@ def main():
     """
     Standalone function to run bulk contact finder
     """
-    bulk_finder = BulkContactFinder()
-    bulk_finder.interactive_bulk_search()
 
 if __name__ == "__main__":
     main()

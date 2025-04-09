@@ -6,10 +6,15 @@ import BotAvatar from './BotAvatar';
 import GLoader from './GLoader';
 import './ChatContainer.css';
 
-const ChatContainer = ({ messages, onSendMessage }) => {
+const ChatContainer = ({ messages, onSendMessage, searchProgress }) => {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Add a debug log to check searchProgress
+  useEffect(() => {
+    console.log("ChatContainer received searchProgress:", searchProgress);
+  }, [searchProgress]);
   
   useEffect(() => {
     // Check if any message has isLoading=true
@@ -70,18 +75,31 @@ const ChatContainer = ({ messages, onSendMessage }) => {
             </div>
           </div>
         ) : (
-          messages.map((msg, index) => (
-            <MessageBubble 
-              key={index} 
-              type={msg.type} 
-              content={msg.content}
-              urls={msg.urls} 
-              filename={msg.filename}
-              companies={msg.companies}
-              evaluation={msg.evaluation} // Pass the evaluation data
-              confidenceRating={msg.confidenceRating} // Pass the confidence rating
-            />
-          ))
+          messages.map((msg, index) => {
+            // Debug log to check what message is being rendered
+            if (msg.companies && msg.companies.length > 0) {
+              console.log(`Rendering message ${index} with companies:`, msg.companies);
+              console.log(`Message ${index} isLoading:`, msg.isLoading);
+              console.log(`Message ${index} has searchProgress:`, msg.searchProgress);
+              console.log(`Global searchProgress:`, searchProgress);
+            }
+            
+            return (
+              <MessageBubble 
+                key={index} 
+                type={msg.type} 
+                content={msg.content}
+                urls={msg.urls} 
+                filename={msg.filename}
+                companies={msg.companies}
+                evaluation={msg.evaluation} 
+                confidenceRating={msg.confidenceRating}
+                isLoading={msg.isLoading}
+                // Use the message's own searchProgress if available, otherwise use the global one
+                searchProgress={msg.searchProgress || searchProgress}
+              />
+            );
+          })
         )}
         <div ref={messagesEndRef} />
       </div>

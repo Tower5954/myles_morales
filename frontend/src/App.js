@@ -10,6 +10,12 @@ import './App.css';
 function App() {
   const [files, setFiles] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [searchProgress, setSearchProgress] = useState({});
+
+  // Debug log for searchProgress changes
+  useEffect(() => {
+    console.log("App searchProgress updated:", searchProgress);
+  }, [searchProgress]);
 
   useEffect(() => {
     // Load saved searches when component mounts
@@ -36,6 +42,14 @@ function App() {
       setFiles([...files, ...newFiles]);
       // If it's a companies list, prompt for search query
       if (result.companies && result.companies.length > 0) {
+        // Initialize search progress for each company
+        const initialProgress = {};
+        result.companies.forEach(company => {
+          initialProgress[company] = false; // Not searched yet
+        });
+        console.log("Initializing search progress:", initialProgress);
+        setSearchProgress(initialProgress);
+        
         setMessages([...messages, {
           type: 'bot',
           content: `Found ${result.companies.length} companies in the file. What would you like to search for across these companies? (e.g., "email addresses", "phone numbers", "contact information")`,
@@ -67,20 +81,70 @@ function App() {
     const lastBotMessage = messages.filter(msg => msg.type === 'bot').pop();
     if (lastBotMessage && lastBotMessage.expectingQuery && lastBotMessage.companies) {
       // User is providing a search query for the companies
+      console.log("Starting bulk search for companies:", lastBotMessage.companies);
+      console.log("Current search progress:", searchProgress);
+      
+      // Create a loading message with companies
       const thinkingMessages = [...newMessages, { 
         type: 'bot', 
         content: `Searching for "${message}" across ${lastBotMessage.companies.length} companies...`,
-        isLoading: true
+        isLoading: true, // This should be true for the progress indicators to show
+        companies: lastBotMessage.companies,
+        // Use the current search progress
+        searchProgress: {...searchProgress} 
       }];
       
       setMessages(thinkingMessages);
       
       try {
-        // Call bulk search API with the companies and the query
-        const result = await bulkSearch(lastBotMessage.companies, message);
+        // Call modified bulk search API that reports progress
+        const result = await bulkSearch(
+          lastBotMessage.companies, 
+          message,
+          // Progress callback function
+          (company) => {
+            console.log(`Progress callback triggered for: ${company}`);
+            
+            // Update the search progress for this company
+            setSearchProgress(prev => {
+              const newProgress = {
+                ...prev,
+                [company]: true // Mark this company as searched
+              };
+              console.log(`Updated searchProgress:`, newProgress);
+              return newProgress;
+            });
+            
+            // Update the loading message to show updated progress
+            setMessages(prevMessages => {
+              // Find the loading message
+              const updatedMessages = [...prevMessages];
+              const loadingMsgIndex = updatedMessages.findIndex(msg => msg.isLoading);
+              
+              if (loadingMsgIndex !== -1) {
+                // Create a new message object with updated searchProgress
+                const updatedLoadingMsg = {
+                  ...updatedMessages[loadingMsgIndex],
+                  searchProgress: {
+                    ...updatedMessages[loadingMsgIndex].searchProgress,
+                    [company]: true
+                  }
+                };
+                
+                console.log(`Updating loading message with progress for ${company}:`, 
+                  updatedLoadingMsg.searchProgress);
+                
+                // Replace the old message with the updated one
+                updatedMessages[loadingMsgIndex] = updatedLoadingMsg;
+              }
+              
+              return updatedMessages;
+            });
+          }
+        );
         
-        // Remove the thinking message
-        const updatedMessages = thinkingMessages.filter(msg => !msg.isLoading);
+        // Remove the thinking message after search completes
+        const updatedMessages = newMessages.filter(msg => !msg.isLoading);
         
         if (result.success) {
           // Extract just the filename from the filepath
@@ -101,15 +165,21 @@ function App() {
           });
         }
         
+        // Update messages and reset progress
         setMessages(updatedMessages);
+        console.log("Bulk search complete, resetting progress");
+        setSearchProgress({});
       } catch (error) {
+        console.error("Error in bulk search:", error);
         // Handle any unexpected errors
-        const updatedMessages = thinkingMessages.filter(msg => !msg.isLoading);
+        const updatedMessages = newMessages.filter(msg => !msg.isLoading);
         updatedMessages.push({
           type: 'bot',
           content: `An error occurred during bulk search: ${error.message || 'Unknown error'}`
         });
         setMessages(updatedMessages);
+        // Reset search progress after error
+        setSearchProgress({});
       }
     } else {
       // Regular contact search
@@ -171,6 +241,7 @@ function App() {
           <ChatContainer 
             messages={messages} 
             onSendMessage={handleSendMessage} 
+            searchProgress={searchProgress}
           />
         </Col>
       </Row>

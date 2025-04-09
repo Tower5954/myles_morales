@@ -171,13 +171,13 @@
 }
 
 .companies-items {
-  margin: 0;
-  padding-left: 20px;
+  list-style-type: none;
+  padding-left: 0 !important;
+  margin-top: 5px;
 }
 
 .companies-items li {
-  margin-bottom: 2px;
-  font-size: 0.9em;
+  padding: 3px 0;
 }
 
 .confidence-rating {
@@ -200,4 +200,25 @@
 .rating-value {
   font-weight: 700;
   color: #26A6AB;
+}
+
+.company-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.company-status {
+  display: inline-flex;
+  margin-right: 8px;
+  width: 14px;
+  height: 14px;
+}
+
+.completed-icon {
+  color: #28a745; 
+}
+
+.pending-icon {
+  color: #6c757d; 
 }

@@ -1,6 +1,6 @@
 import React from 'react';
 import BotAvatar from './BotAvatar';
-import { Person, Download } from 'react-bootstrap-icons';
+import { Person, Download, CheckCircleFill, Circle } from 'react-bootstrap-icons';
 import './MessageBubble.css';
 
 const MessageBubble = ({ 
@@ -10,8 +10,27 @@ const MessageBubble = ({
   filename, 
   companies = [],
   evaluation,
-  confidenceRating
+  confidenceRating,
+  isLoading,
+  searchProgress = {}
 }) => {
+  // Enhanced debugging - log the exact keys in searchProgress
+  if (companies && companies.length > 0) {
+    console.log("MessageBubble rendering for companies:", companies);
+    console.log("isLoading:", isLoading);
+    console.log("searchProgress:", searchProgress);
+    console.log("searchProgress keys:", Object.keys(searchProgress));
+    
+    // Try to find matches
+    companies.forEach(company => {
+      console.log(`Looking for matches for: ${company}`);
+      Object.keys(searchProgress).forEach(key => {
+        const match = key.includes(company) || company.includes(key);
+        console.log(`  Key: ${key}, Match: ${match}`);
+      });
+    });
+  }
+  
   return (
     <div className={`message-bubble ${type}-message`}>
       <div className="avatar-container">
@@ -50,15 +69,37 @@ const MessageBubble = ({
           </div>
         )}
         
-        {/* Show companies list if provided */}
+        {/* Show companies list with progress indicators - Using more flexible matching */}
         {companies && companies.length > 0 && (
           <div className="companies-list">
             <div className="companies-label">Companies:</div>
             <ul className="companies-items">
-              {companies.slice(0, 5).map((company, index) => (
-                <li key={index}>{company}</li>
-              ))}
-              {companies.length > 5 && <li>...and {companies.length - 5} more</li>}
+            {companies.map((company, index) => {
+              // Add more detailed debugging
+              const found = company in searchProgress;
+              const value = found ? searchProgress[company] : 'not found';
+              console.log(`Company: ${company}, Found in searchProgress: ${found}, Value: ${value}`);
+              
+              // Check if this company has been processed
+              const isProcessed = searchProgress && company in searchProgress && 
+                (searchProgress[company] === true || 
+                searchProgress[company] === "True" || 
+                searchProgress[company] === 1 ||
+                String(searchProgress[company]).toLowerCase() === "true");
+              
+              return (
+                <li key={index} className="company-item">
+                  <span className="company-status">
+                    {isProcessed ? (
+                      <CheckCircleFill className="completed-icon" size={14} />
+                    ) : (
+                      <Circle className="pending-icon" size={14} />
+                    )}
+                  </span>
+                  {company}
+                </li>
+              );
+            })}
             </ul>
           </div>
         )}

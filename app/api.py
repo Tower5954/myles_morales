@@ -68,18 +68,30 @@ def api_bulk_search():
     names = data.get('names', [])
     query = data.get('query', 'contact details')
     
+    # Create a simple dictionary to track progress
+    progress_tracker = {name: False for name in names}
+    
     try:
-        # Always use evaluation with bulk search - pass the evaluator directly
-        filename = bulk_finder.bulk_search(names, query, prowler=evaluator)
+        # Define a progress callback that updates our tracker
+        def progress_callback(company_name):
+            progress_tracker[company_name] = True
+            print(f"Updated progress for {company_name}: {progress_tracker}")
         
-        # For clarity in logs
+        # Pass the callback to bulk_finder
+        filename = bulk_finder.bulk_search(
+            names, 
+            query, 
+            prowler=evaluator,
+            progress_callback=progress_callback
+        )
+        
         print(f"Bulk search completed with automatic evaluation, file saved at: {filename}")
         
-        # Return the full file path (we'll use this in the frontend)
         return jsonify({
             'success': True, 
             'message': f"Bulk search completed with evaluation. Results are ready to download.",
-            'filepath': filename  # Return the full file path
+            'filepath': filename,
+            'progress': progress_tracker  # Return the final progress state
         })
     except Exception as e:
         print(f"Error in bulk search: {str(e)}")
@@ -208,12 +220,4 @@ def setup_models():
         return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
-    # Setup the prowler model when the application starts
-    try:
-        evaluator.setup()
-        print("Prowler AI model has been set up successfully.")
-    except Exception as e:
-        print(f"Warning: Failed to set up Prowler AI model: {e}")
-        print("Evaluation functionality may not work until the model is set up.")
-        
     app.run(debug=True, port=5000)
