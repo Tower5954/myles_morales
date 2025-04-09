@@ -21,8 +21,25 @@ export const findContact = async (query, url = null, interactive = false) => {
   }
 };
 
-export const bulkSearch = async (names, query) => {
+// Global variable to store the progress callback reference
+let currentProgressCallback = null;
+
+// Function that can be called to update progress
+window.updateCompanyProgress = function(companyName) {
+  if (currentProgressCallback && typeof currentProgressCallback === 'function') {
+    currentProgressCallback(companyName);
+    console.log(`Progress updated for: ${companyName}`);
+    return true;
+  }
+  return false;
+};
+
+export const bulkSearch = async (names, query, progressCallback = null) => {
   try {
+    // Store the callback function in the global variable
+    currentProgressCallback = progressCallback;
+    
+    // Make the actual API call
     const response = await fetch(`${API_URL}/bulk`, {
       method: 'POST',
       headers: {
@@ -30,8 +47,10 @@ export const bulkSearch = async (names, query) => {
       },
       body: JSON.stringify({ names, query }),
     });
+    
     return await response.json();
   } catch (error) {
+    currentProgressCallback = null;
     return { success: false, error: error.message };
   }
 };
