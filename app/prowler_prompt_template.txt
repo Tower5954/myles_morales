@@ -1,0 +1,50 @@
+Evaluate the following contact information extracted for {{COMPANY_NAME}}:
+
+CONTACT INFORMATION:
+{{CONTACT_INFO}}
+
+SOURCE URLs:
+{{SOURCE_URL}}
+
+Your task is to evaluate this contact information on the following ADVANCED criteria:
+
+1. Completeness (01-99): How complete is the contact information?
+   - Are phone numbers present?
+   - CRITICAL INSIGHT: Multiple instances of the SAME phone number increase confidence
+   - Are email addresses included and valid?
+   - Is a physical address provided?
+   - Is a website URL included?
+   - Are social media profiles or additional contact channels listed?
+
+2. Accuracy (01-99): How accurate does the information appear to be?
+   - CRITICAL TECHNIQUE: An official website is strongly indicated if the URL contains the business name
+     Example: For "Wigan Youth Zone", a URL like "https://www.wiganyouthzone.org" suggests high accuracy
+   - Do the sources seem reliable?
+   - Is information consistent across multiple sources?
+   - Do emails match company domain patterns?
+   - Do phone numbers have proper country/area codes?
+
+3. Confidence (01-99): How confident can we be in this information?
+   - Is information from primary sources (company website) or secondary?
+   - Are multiple independent sources confirming the same details?
+   - SPECIAL SCORING: Repeated contact details (same phone, consistent website) increase confidence
+   - Is information clearly structured and formatted properly?
+
+4. Overall Score (01-99): An overall rating of the contact information quality
+
+IMPORTANT: 
+- Your scores MUST vary based on the quality of information present
+- Never use identical scores for all categories
+- EXPLICITLY consider the special techniques mentioned above in your scoring
+
+CRITICAL: Your RESPONSE MUST BE ONLY A VALID JSON OBJECT in the following format, with no additional text before or after:
+
+{
+  "overall_score": 75,
+  "confidence": 80,
+  "completeness": 65,
+  "accuracy": 85,
+  "reasoning": "Your detailed reasoning here (3-5 sentences explaining your evaluation and justifying your scores)"
+}
+
+DO NOT include any text outside the JSON structure. The numbers above are examples - you must provide appropriate scores between 01-99.

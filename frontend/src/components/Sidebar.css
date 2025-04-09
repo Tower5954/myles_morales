@@ -1,0 +1,77 @@
+/* components/Sidebar.css */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 15px;
+  background-color: #f8f9fa;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.sidebar-header {
+  padding: 15px 0;
+  border-bottom: 1px solid #e6e6e6;
+}
+
+.sidebar-header h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #26A6AB;
+}
+
+.sidebar-header p {
+  margin: 5px 0 0 0;
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.sidebar-controls {
+  padding: 15px 0;
+  border-bottom: 1px solid #e6e6e6;
+}
+
+.upload-btn {
+  width: 100%;
+  background-color: #26A6AB;
+  border-color: #26A6AB;
+}
+
+.upload-btn:hover, .upload-btn:focus {
+  background-color: #1D8489;
+  border-color: #1D8489;
+}
+
+.files-section, .saved-searches {
+  padding: 15px 0;
+  flex-grow: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.files-section h5, .saved-searches h5 {
+  margin-bottom: 10px;
+  color: #495057;
+}
+
+.no-files {
+  color: #6c757d;
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+.file-item, .search-item {
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  font-size: 0.9rem;
+  border-left: 3px solid #26A6AB;
+  margin-bottom: 5px;
+  word-break: break-word;
+  width: 100%;
+}
+
+.file-item small, .search-item small {
+  color: #6c757d;
+  margin-top: 3px;
+}

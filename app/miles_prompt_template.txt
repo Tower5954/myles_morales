@@ -1,0 +1,9 @@
+Find contact information for: {{business_name}}
+
+SEARCH RESULTS ANALYSIS:
+
+FOUND URLS:
+{{urls}}
+
+INSTRUCTIONS: Extract any contact information visible in the search results. 
+List all potential sources of information with their URL numbers. 

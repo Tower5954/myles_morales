@@ -1,0 +1,13 @@
+/* components/GLoader.css */
+.g-loader-container {
+    text-align: center;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  
+  /* Remove any potential extra space around SVG */
+  .g-loader-container svg {
+    display: block;
+    overflow: visible;
+  }
