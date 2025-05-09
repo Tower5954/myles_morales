@@ -1,0 +1,16 @@
+{
+    "model_name": "miles_web",
+    "base_model": "qwen2.5:latest",
+    "modelfile_path": "Modelfile",
+    "prompt_template_path": "miles_prompt_template.txt",
+    "system_prompt_path": "miles_system_prompt.txt",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "request_timeout": 10,
+    "request_delay": 1.0,
+    "max_search_results": 5,
+    "max_depth": 2,
+    "search_engine": "https://www.google.com/search?q=",
+    "verbose": true,
+    "model_provider": "openai",
+    "evaluator_provider": "openai"
+}

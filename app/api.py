@@ -1,26 +1,47 @@
-# app/api.py
-from flask import Flask, request, jsonify, send_from_directory, send_file
+from flask import Flask, request, jsonify, send_from_directory, send_file, Response, stream_with_context
 from flask_cors import CORS
 import os
 import sys
 import json
+import queue
+import threading
+import time
+import argparse
+
+# Set up argument parser
+parser = argparse.ArgumentParser(description="Contact Finder API")
+parser.add_argument("--config", default="../config.json", help="Path to config file")
+args = parser.parse_args()
+
+# Use config path from arguments
+config_path = args.config
+print(f"Loading configuration from: {config_path}")
 
 # Import existing modules
 from contact_finder import ContactFinder
 from bulk_contact_finder import BulkContactFinder
 from contact_evaluator import ContactEvaluator
 
+from config_manager import ConfigManager
+temp_config = ConfigManager(config_path)
+
+# Get the model provider and force evaluator provider to match
+model_provider = temp_config.get("model_provider", "ollama")
+temp_config.set("evaluator_provider", model_provider)
+print(f"Setting evaluator provider to match model provider: {model_provider}")
+
+
 app = Flask(__name__, static_folder='../frontend/build', static_url_path='')
 # Enable CORS for cross-origin requests during development
 CORS(app)  
 
 # Initialise with config path just like in main.py
-config_path = "../config.json"  
 contact_finder = ContactFinder(config_path)
-bulk_finder = BulkContactFinder(config_path, "../contact_search_results")  # Specify the full path to match where files are saved
-
-# Initialise prowler
+bulk_finder = BulkContactFinder(config_path, "../contact_search_results")
 evaluator = ContactEvaluator(config_path)
+
+# Create a dictionary to store progress queues for SSE
+progress_queues = {}
 
 @app.route('/api/find', methods=['POST'])
 def api_find_contact():
@@ -62,11 +83,64 @@ def api_find_contact():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
+# New endpoint for SSE progress updates
+@app.route('/api/progress-stream/<request_id>', methods=['GET'])
+def progress_stream(request_id):
+    """Endpoint for SSE progress updates"""
+    def generate():
+        if request_id not in progress_queues:
+            yield f"data: {json.dumps({'error': 'Invalid request ID'})}\n\n"
+            return
+            
+        q = progress_queues[request_id]
+        
+        # Send an initial event
+        yield f"data: {json.dumps({'status': 'connected'})}\n\n"
+        
+        while True:
+            try:
+                # Get progress update from the queue with a short timeout
+                progress_data = q.get(timeout=0.5)
+                
+                # If we received a "DONE" signal, end the stream
+                if progress_data == "DONE":
+                    yield f"data: {json.dumps({'status': 'complete'})}\n\n"
+                    break
+                
+                # Otherwise, send the progress update
+                yield f"data: {json.dumps(progress_data)}\n\n"
+                
+            except queue.Empty:
+                # Send an empty keep-alive message
+                yield f": keepalive\n\n"
+            except Exception as e:
+                print(f"Error in SSE: {str(e)}")
+                break
+        
+        # Clean up when done
+        if request_id in progress_queues:
+            del progress_queues[request_id]
+    
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no'  # Disable buffering in Nginx
+        }
+    )
+
 @app.route('/api/bulk', methods=['POST'])
 def api_bulk_search():
     data = request.json
     names = data.get('names', [])
     query = data.get('query', 'contact details')
+    
+    # Generate a unique request ID
+    request_id = str(int(time.time()))
+    
+    # Create a queue for this request's progress updates
+    progress_queues[request_id] = queue.Queue()
     
     # Create a simple dictionary to track progress
     progress_tracker = {name: False for name in names}
@@ -76,25 +150,50 @@ def api_bulk_search():
         def progress_callback(company_name):
             progress_tracker[company_name] = True
             print(f"Updated progress for {company_name}: {progress_tracker}")
+            
+            # Send update through the SSE queue
+            progress_queues[request_id].put({
+                'companyName': company_name,
+                'progress': progress_tracker
+            })
         
-        # Pass the callback to bulk_finder
-        filename = bulk_finder.bulk_search(
-            names, 
-            query, 
-            prowler=evaluator,
-            progress_callback=progress_callback
-        )
+        # Start the bulk search in a separate thread
+        def run_bulk_search():
+            try:
+                # Pass the callback to bulk_finder
+                filename = bulk_finder.bulk_search(
+                    names, 
+                    query, 
+                    prowler=evaluator,
+                    progress_callback=progress_callback
+                )
+                
+                # Signal that search is complete
+                progress_queues[request_id].put("DONE")
+                
+                print(f"Bulk search completed with automatic evaluation, file saved at: {filename}")
+            except Exception as e:
+                print(f"Error in bulk search thread: {str(e)}")
+                if request_id in progress_queues:
+                    progress_queues[request_id].put({
+                        'error': str(e)
+                    })
+                    progress_queues[request_id].put("DONE")
         
-        print(f"Bulk search completed with automatic evaluation, file saved at: {filename}")
+        # Start the thread
+        thread = threading.Thread(target=run_bulk_search)
+        thread.daemon = True
+        thread.start()
         
+        # Immediately return the request ID so client can connect to progress stream
         return jsonify({
             'success': True, 
-            'message': f"Bulk search completed with evaluation. Results are ready to download.",
-            'filepath': filename,
-            'progress': progress_tracker  # Return the final progress state
+            'message': f"Bulk search started. Connect to progress stream for updates.",
+            'requestId': request_id,
+            'progress': progress_tracker  # Return the initial progress state
         })
     except Exception as e:
-        print(f"Error in bulk search: {str(e)}")
+        print(f"Error setting up bulk search: {str(e)}")
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/evaluate', methods=['POST'])

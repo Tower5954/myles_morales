@@ -1,40 +1,43 @@
 import os
 import json
 import re
-import time
+from evaluator_factory import get_evaluator
 from config_manager import ConfigManager
-from model_manager import ModelManager
+from model_factory import get_model_manager  # You'll need to create this
 
 class ContactEvaluator:
     """
-    Evaluates contact information extracted by miles_ai using prowler_ai
+    Evaluates contact information extracted by miles_ai using configurable evaluator
     """
     
     def __init__(self, config_path="config.json"):
         # Load the main config
-        self.config = ConfigManager(config_path)
+        self.config_manager = ConfigManager(config_path)
         
-        # Create separate config for prowler
-        self.prowler_config = ConfigManager("prowler_config.json")
+        # Get the model provider from config (default to "ollama")
+        model_provider = self.config_manager.get("model_provider", "ollama")
+        evaluator_provider = self.config_manager.get("evaluator_provider", "prowler")
         
-        # Set default prowler config values if they don't exist
-        if not self.prowler_config.get("model_name"):
-            self.prowler_config.set("model_name", "prowler_ai")
-            self.prowler_config.set("base_model", self.config.get("base_model", "qwen2.5:latest"))
-            self.prowler_config.set("modelfile_path", "ProwlerModelfile")
-            self.prowler_config.set("prompt_template_path", "prowler_prompt_template.txt")
+        print(f"Using model provider: {model_provider}")
+        print(f"Using evaluator provider: {evaluator_provider}")
         
-        # Load the prompt template
+        # Get the appropriate evaluator using the factory
+        self.evaluator = get_evaluator(self.config_manager)
+        
+        # Load the prompt template (still needed for some operations)
         self._load_prompt_template()
-        
-        # Create model manager for prowler
-        self.prowler_model = ModelManager(self.prowler_config)
     
     def _load_prompt_template(self):
         """
         Load the prompt template from the specified file
         """
-        template_path = self.prowler_config.get("prompt_template_path", "prowler_prompt_template.txt")
+        # Determine template path based on evaluator provider
+        evaluator_provider = self.config_manager.get("evaluator_provider", "prowler").lower()
+        
+        if evaluator_provider == "openai":
+            template_path = self.config_manager.get("miles_prompt_template_path", "miles_prompt_template.txt")
+        else:
+            template_path = self.config_manager.get("prowler_prompt_template_path", "prowler_prompt_template.txt")
         
         try:
             with open(template_path, 'r') as file:
@@ -45,8 +48,8 @@ class ContactEvaluator:
             raise RuntimeError(f"Error reading prompt template: {e}")
     
     def setup(self):
-        """Set up prowler model"""
-        return self.prowler_model.create_model()
+        """Set up the evaluator model"""
+        return self.evaluator.setup_model()
     
     def evaluate_contact_info(self, contact_info_text, business_name="", source_urls=None):
         """
@@ -60,106 +63,96 @@ class ContactEvaluator:
         Returns:
             Dictionary with evaluation and simplified results
         """
-        # Evaluate the contact information
-        evaluation = self._evaluate_contact_info(contact_info_text, business_name, source_urls)
+        # Use the evaluator to evaluate the contact information
+        context = {"source_url": source_urls} if source_urls else {}
+        evaluation = self.evaluator.evaluate_contact_info(contact_info_text, business_name, context)
+        
+        # Extract the actual evaluation metrics
+        if isinstance(evaluation, dict) and "evaluation" in evaluation:
+            eval_metrics = evaluation["evaluation"]
+        else:
+            eval_metrics = evaluation
         
         # Format simplified output
-        simplified = self._format_simplified_results(contact_info_text, evaluation)
+        simplified = self._format_simplified_results(contact_info_text, eval_metrics)
         
         # Return both
         return {
-            "evaluation": evaluation,
+            "evaluation": eval_metrics,
             "simplified": simplified,
             "contact_info": contact_info_text
         }
     
-    def _evaluate_contact_info(self, contact_info_text, business_name="", source_urls=None):
+    def find_and_evaluate_contacts(self, business_name, urls=None):
         """
-        Use prowler_ai to evaluate contact information
-        """
-        # Limit the size of the contact info text to avoid memory issues
-        max_length = 800  # Set a reasonable character limit
-        if len(contact_info_text) > max_length:
-            contact_info_text = contact_info_text[:max_length] + "...[truncated]"
-        
-        # Prepare source URLs
-        source_urls_text = ""
-        if source_urls:
-            if isinstance(source_urls, list):
-                # Limit number of URLs to avoid large prompts
-                limited_urls = source_urls[:3]  # Use only first 3 URLs
-                source_urls_text = "\n".join(limited_urls)
-            else:
-                source_urls_text = str(source_urls)
-        
-        # Prepare the prompt by replacing placeholders
-        prompt = self.prompt_template.replace('{{COMPANY_NAME}}', business_name or "Unknown Business")
-        prompt = prompt.replace('{{CONTACT_INFO}}', contact_info_text)
-        prompt = prompt.replace('{{SOURCE_URL}}', source_urls_text)
-        
-        print(f"Evaluating information for: {business_name}")
-        
-        try:
-            # Query the prowler_ai model
-            result = self.prowler_model.query_model(prompt)
-            
-            # Validate result is a non-empty string
-            if not result or not isinstance(result, str):
-                raise ValueError("Invalid response from prowler_ai: Empty or non-string response")
-            
-            # Try to parse the JSON
-            try:
-                evaluation = json.loads(result)
-            except json.JSONDecodeError:
-                # Try to extract JSON from the response
-                json_match = re.search(r'(\{[^{]*"overall_score"[^}]*\})', result, re.DOTALL)
-                
-                if json_match:
-                    json_str = json_match.group(0)
-                    evaluation = json.loads(json_str)
-                else:
-                    # If JSON extraction fails, raise an error
-                    raise ValueError(f"Cannot parse JSON from response: {result}")
-            
-            # Validate the evaluation dictionary
-            required_keys = ["overall_score", "confidence", "completeness", "accuracy"]
-            for key in required_keys:
-                if key not in evaluation:
-                    raise ValueError(f"Missing required key: {key}")
-                
-                # Ensure values are integers between 1-99
-                try:
-                    score = int(float(evaluation[key]))
-                    if score < 1 or score > 99:
-                        raise ValueError(f"Score {key} must be between 1-99")
-                    evaluation[key] = score
-                except (ValueError, TypeError):
-                    raise ValueError(f"Invalid score for {key}")
-            
-            # Ensure reasoning is present
-            if "reasoning" not in evaluation or not evaluation["reasoning"]:
-                evaluation["reasoning"] = "Evaluation completed based on contact information."
-            
-            return evaluation
-        
-        except Exception as e:
-            # Log the error
-            print(f"Error in contact information evaluation: {str(e)}")
-            
-            # Raise the exception to allow caller to handle it
-            raise
-
-    def _format_simplified_results(self, contact_info_text, evaluation):
-        """
-        Format the results in a simplified format with confidence rating
+        Find and evaluate contact information for a business
         
         Args:
-            contact_info_text: Text from miles_ai
-            evaluation: Evaluation metrics dictionary
+            business_name: Name of the business to search for
+            urls: Optional list of URLs to scrape
             
         Returns:
-            String with simplified contact info and rating
+            String with the evaluation results
         """
+        # Import here to avoid circular imports
+        from contact_finder import ContactFinder
+        
+        # Create a contact finder instance
+        finder = ContactFinder(self.config_manager.config_path)
+        
+        # Find contact information
+        if urls and len(urls) > 0:
+            # Scrape the specified URL
+            contact_info = finder.deep_scrape_url(urls[0], business_name)
+            source_urls = urls
+        else:
+            # Do an initial search
+            contact_info, found_urls = finder.initial_search(business_name)
+            source_urls = found_urls
+        
+        # Evaluate the contact information
+        result = self.evaluate_contact_info(contact_info, business_name, source_urls)
+        
+        # Save the result to a file
+        os.makedirs("contact_search_results", exist_ok=True)
+        safe_name = business_name.replace(" ", "_").replace("/", "_").replace("\\", "_")
+        result_path = f"contact_search_results/{safe_name}_results.json"
+        
+        with open(result_path, 'w') as f:
+            json.dump(result, f, indent=2)
+        
+        # Format a summary of the result
+        return self._format_result_summary(result, business_name)
+    
+    def _format_result_summary(self, result, business_name):
+        """Format a summary of the evaluation result"""
+        evaluation = result["evaluation"]
+        simplified = result["simplified"]
+        
+        summary = [
+            f"Contact Information Evaluation for {business_name}",
+            "-" * 80,
+            f"Overall Score: {evaluation.get('overall_score', 'N/A')}/100",
+            f"Confidence: {evaluation.get('confidence', 'N/A')}/100",
+            f"Completeness: {evaluation.get('completeness', 'N/A')}/100",
+            f"Accuracy: {evaluation.get('accuracy', 'N/A')}/100",
+            "",
+            "Summary:",
+            simplified,
+            "",
+            "Reasoning:",
+            evaluation.get('reasoning', 'No reasoning provided.')
+        ]
+        
+        return "\n".join(summary)
+    @property
+    def prowler_model(self):
+        """Backward compatibility property for legacy code"""
+        return self.evaluator.model_manager
+    
+    # Keep existing helper methods for extracting information
+    def _format_simplified_results(self, contact_info_text, evaluation):
+        """Format the results in a simplified format with confidence rating"""
         # Extract key information from contact_info_text
         business_name = self._extract_business_name(contact_info_text)
         phone_numbers = self._extract_phone_numbers(contact_info_text)
